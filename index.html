@@ -1,1 +1,278 @@
 
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reparto entre hermanos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-database-compat.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { min-height: 100vh; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', system-ui, sans-serif; padding: 16px; }
+  .card { background: rgba(255,255,255,0.05); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 36px 28px; max-width: 400px; width: 100%; color: #f1f5f9; }
+  h1 { font-size: 21px; font-weight: 700; text-align: center; color: #e2e8f0; margin-bottom: 2px; }
+  .sub { text-align: center; font-size: 13px; color: #94a3b8; margin-bottom: 28px; }
+  .label { font-size: 15px; color: #cbd5e1; margin-bottom: 16px; text-align: center; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+  .name-btn { width: 100%; padding: 14px 20px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); color: #e2e8f0; font-size: 16px; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; transition: all 0.2s; }
+  .name-btn.done { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.3); color: #4ade80; }
+  .name-btn .check { font-size: 12px; opacity: 0.7; }
+  .salary-input { width: 100%; padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.07); color: #f1f5f9; font-size: 20px; font-weight: 600; text-align: center; outline: none; }
+  .salary-input::placeholder { color: #64748b; font-weight: 400; }
+  .btn-primary { margin-top: 16px; width: 100%; padding: 14px; border-radius: 14px; border: none; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; }
+  .btn-primary:disabled { opacity: 0.5; cursor: wait; }
+  .btn-back { margin-top: 10px; width: 100%; padding: 10px; border-radius: 10px; border: none; background: transparent; color: #94a3b8; font-size: 13px; cursor: pointer; }
+  .btn-reset { margin-top: 20px; width: 100%; padding: 12px; border-radius: 12px; border: 1px solid rgba(239,68,68,0.25); background: rgba(239,68,68,0.08); color: #f87171; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .error { color: #f87171; font-size: 13px; text-align: center; margin-top: 8px; }
+  .icon { font-size: 38px; text-align: center; margin-bottom: 14px; }
+  .pills { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .pill { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+  .pill.done { background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
+  .pill.pending { background: rgba(255,255,255,0.06); color: #64748b; border: 1px solid rgba(255,255,255,0.08); }
+  .result-row { position: relative; border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); margin-bottom: 10px; }
+  .result-bar { position: absolute; top: 0; left: 0; bottom: 0; background: linear-gradient(90deg, rgba(99,102,241,0.3), rgba(59,130,246,0.12)); transition: width 0.8s ease; }
+  .result-inner { position: relative; display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; }
+  .result-name { font-size: 15px; font-weight: 600; }
+  .result-pct { font-size: 19px; font-weight: 700; color: #818cf8; }
+  .hint { text-align: center; font-size: 12px; color: #64748b; margin-top: 16px; }
+  .greeting { font-size: 16px; color: #cbd5e1; margin-bottom: 4px; text-align: center; }
+  .input-label { font-size: 14px; color: #94a3b8; margin-bottom: 24px; text-align: center; }
+  .wait-msg { font-size: 14px; color: #94a3b8; margin-bottom: 20px; text-align: center; }
+  .method-note { text-align: center; font-size: 11px; color: #475569; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>Reparto entre hermanos</h1>
+  <p class="sub">Calcula el % que pone cada uno</p>
+
+  <!-- PANTALLA 1: Selección -->
+
+  <div id="screen-select" class="screen active">
+    <p class="label">¿Quién eres?</p>
+    <div id="name-buttons"></div>
+    <button id="btn-reset-select" class="btn-reset" style="display:none" onclick="resetAll()">Reiniciar todo</button>
+  </div>
+
+  <!-- PANTALLA 2: Salario -->
+
+  <div id="screen-input" class="screen">
+    <p class="greeting" id="greeting"></p>
+    <p class="input-label">Introduce tu salario mensual neto (€)</p>
+    <input class="salary-input" id="salary-input" type="text" inputmode="decimal" placeholder="Ej: 2500">
+    <p class="error" id="error" style="display:none"></p>
+    <button class="btn-primary" id="btn-submit" onclick="submitSalary()">Enviar</button>
+    <button class="btn-back" onclick="goHome()">← Volver</button>
+  </div>
+
+  <!-- PANTALLA 3: Espera -->
+
+  <div id="screen-waiting" class="screen">
+    <div class="icon">⏳</div>
+    <p class="greeting" id="wait-greeting"></p>
+    <p class="wait-msg" id="wait-msg"></p>
+    <div class="pills" id="wait-pills"></div>
+    <button class="btn-back" style="margin-top:24px" onclick="goHome()">← Volver al inicio</button>
+  </div>
+
+  <!-- PANTALLA 4: Resultados -->
+
+  <div id="screen-results" class="screen">
+    <div class="icon">📊</div>
+    <p class="label" style="margin-bottom:24px">Cada uno pone este % del total</p>
+    <div id="results-list"></div>
+    <p class="hint">Multiplica tu % por el importe del regalo</p>
+    <p class="method-note">Reparto con raíz cuadrada (comprime diferencias salariales)</p>
+    <button class="btn-reset" onclick="resetAll()">Reiniciar (nuevo reparto)</button>
+    <button class="btn-back" style="margin-top:8px" onclick="goHome()">← Volver al inicio</button>
+  </div>
+</div>
+
+<script>
+const SIBLINGS = ["Ignacio", "Jesús", "Lucía", "Juan"];
+const EXPONENT = 0.5; // Raíz cuadrada
+
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyCuydo_KSba1nI1-oBHruO-Tfd6e2keHuw",
+  authDomain: "app-hermanos-regalo-papa.firebaseapp.com",
+  databaseURL: "https://app-hermanos-regalo-papa-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "app-hermanos-regalo-papa",
+  storageBucket: "app-hermanos-regalo-papa.firebasestorage.app",
+  messagingSenderId: "548903381962",
+  appId: "1:548903381962:web:00378f7429bf3d0f34fd33"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const salariesRef = db.ref("salaries");
+
+let currentUser = null;
+let salaries = {};
+
+// Escuchar cambios en tiempo real
+salariesRef.on("value", (snapshot) => {
+  salaries = snapshot.val() || {};
+  updateUI();
+});
+
+function updateUI() {
+  const filled = Object.keys(salaries).length;
+  const allIn = filled === 4;
+
+  // Actualizar botones de selección
+  renderNameButtons();
+
+  // Si estamos en espera y ya están los 4, ir a resultados
+  const activeScreen = document.querySelector(".screen.active");
+  if (activeScreen && activeScreen.id === "screen-waiting" && allIn) {
+    showScreen("screen-results");
+    renderResults();
+  }
+
+  // Mostrar/ocultar reset en select
+  const resetBtn = document.getElementById("btn-reset-select");
+  if (resetBtn) resetBtn.style.display = filled > 0 ? "block" : "none";
+}
+
+function renderNameButtons() {
+  const container = document.getElementById("name-buttons");
+  if (!container) return;
+  container.innerHTML = "";
+  SIBLINGS.forEach((name) => {
+    const btn = document.createElement("button");
+    const done = salaries[name] !== undefined;
+    btn.className = "name-btn" + (done ? " done" : "");
+    btn.innerHTML = `<span>${name}</span>${done ? '<span class="check">✓ enviado</span>' : ''}`;
+    btn.onclick = () => selectUser(name);
+    container.appendChild(btn);
+  });
+}
+
+function selectUser(name) {
+  currentUser = name;
+  if (salaries[name] !== undefined) {
+    if (Object.keys(salaries).length === 4) {
+      showScreen("screen-results");
+      renderResults();
+    } else {
+      showScreen("screen-waiting");
+      renderWaiting();
+    }
+  } else {
+    showScreen("screen-input");
+    document.getElementById("greeting").textContent = `Hola, ${name}`;
+    document.getElementById("salary-input").value = "";
+    document.getElementById("error").style.display = "none";
+  }
+}
+
+function parseInput(str) {
+  const cleaned = str.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  const num = parseFloat(cleaned);
+  return isNaN(num) || num <= 0 ? null : num;
+}
+
+function submitSalary() {
+  const input = document.getElementById("salary-input").value;
+  const val = parseInput(input);
+  if (!val) {
+    document.getElementById("error").textContent = "Introduce un número válido";
+    document.getElementById("error").style.display = "block";
+    return;
+  }
+
+  const btn = document.getElementById("btn-submit");
+  btn.disabled = true;
+  btn.textContent = "Guardando...";
+
+  salariesRef.child(currentUser).set(val)
+    .then(() => {
+      btn.disabled = false;
+      btn.textContent = "Enviar";
+      // Firebase listener will update salaries and call updateUI
+      // Check manually in case the listener already fired
+      if (Object.keys(salaries).length === 4) {
+        showScreen("screen-results");
+        renderResults();
+      } else {
+        showScreen("screen-waiting");
+        renderWaiting();
+      }
+    })
+    .catch((e) => {
+      btn.disabled = false;
+      btn.textContent = "Enviar";
+      document.getElementById("error").textContent = "Error al guardar. Inténtalo de nuevo.";
+      document.getElementById("error").style.display = "block";
+    });
+}
+
+function renderWaiting() {
+  document.getElementById("wait-greeting").textContent = `Gracias, ${currentUser}`;
+  const missing = SIBLINGS.filter((s) => salaries[s] === undefined);
+  document.getElementById("wait-msg").textContent = missing.length === 1
+    ? `Falta ${missing[0]} por introducir su salario`
+    : `Faltan ${missing.length} hermanos por introducir su salario`;
+
+  const pills = document.getElementById("wait-pills");
+  pills.innerHTML = "";
+  SIBLINGS.forEach((name) => {
+    const done = salaries[name] !== undefined;
+    const pill = document.createElement("div");
+    pill.className = "pill " + (done ? "done" : "pending");
+    pill.textContent = name + (done ? " ✓" : " …");
+    pills.appendChild(pill);
+  });
+}
+
+function renderResults() {
+  const total = SIBLINGS.reduce((sum, name) => sum + Math.pow(salaries[name] || 0, EXPONENT), 0);
+  const container = document.getElementById("results-list");
+  container.innerHTML = "";
+
+  SIBLINGS.forEach((name) => {
+    const pct = total > 0 ? (Math.pow(salaries[name] || 0, EXPONENT) / total) * 100 : 0;
+    const row = document.createElement("div");
+    row.className = "result-row";
+    row.innerHTML = `
+      <div class="result-bar" style="width:${pct}%"></div>
+      <div class="result-inner">
+        <span class="result-name">${name}</span>
+        <span class="result-pct">${pct.toFixed(1)}%</span>
+      </div>`;
+    container.appendChild(row);
+  });
+}
+
+function resetAll() {
+  salariesRef.remove().then(() => {
+    salaries = {};
+    currentUser = null;
+    goHome();
+  });
+}
+
+function goHome() {
+  currentUser = null;
+  document.getElementById("salary-input").value = "";
+  document.getElementById("error").style.display = "none";
+  showScreen("screen-select");
+  renderNameButtons();
+}
+
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+// Render inicial
+renderNameButtons();
+</script>
+
+</body>
+</html>
